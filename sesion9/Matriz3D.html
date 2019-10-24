@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+    <body onload="start()">
+        <canvas id="webgl" width="640" height="480">
+            No Soporta Canvas
+        </canvas>
+        <script src="m4.js" type="text/javascript"></script>
+        <script>
+            var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
+                              window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+            window.requestAnimationFrame = requestAnimationFrame;
+
+            var gl;
+            var canvas;
+            var program;
+
+            var in_position;
+            var in_color;
+
+            var loc_u_proj;
+            var loc_u_view;
+            var loc_u_model;
+
+            var vao;
+
+            var m_proj;
+            var m_view;
+            var m_model;
+
+            var VERTEX_SOURCE = `#version 300 es 
+                in vec3 in_position;
+                in vec3 in_color;
+                out vec3 o_color;
+
+                uniform mat4 u_proj;
+                uniform mat4 u_view;
+                uniform mat4 u_model;
+
+                void main() {
+                   gl_Position = u_proj * u_view * u_model * vec4(in_position.xyz , 1);
+                   o_color = in_color; 
+                }
+            `;
+
+            var FRAGMENT_SOURCE = `#version 300 es
+                precision highp float;
+                in vec3 o_color;
+                out vec4 color;
+
+                void main() {
+                    color = vec4(o_color.xyz , 1);
+                }
+            `;
+
+            function start() {
+                canvas = document.getElementById("webgl");
+                initWebgl();
+
+                var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+                if (!vertexShader) {
+                    console.log("Error el crear vertex shader");
+                    return;
+                }
+                gl.shaderSource(vertexShader , VERTEX_SOURCE);
+                gl.compileShader(vertexShader);
+
+                var compiled = gl.getShaderParameter(vertexShader , gl.COMPILE_STATUS);
+                var error = "";
+                if (!compiled) {
+                    error = gl.getShaderInfoLog(vertexShader);
+                    console.log("Error compilación Vertex Shader " + error);
+                    return;
+                }
+
+                var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+                if (!fragmentShader) {
+                    console.log("Error al crear fragment shader");
+                    return;
+                }
+                gl.shaderSource(fragmentShader , FRAGMENT_SOURCE);
+                gl.compileShader(fragmentShader);
+
+                compiled = gl.getShaderParameter(fragmentShader , gl.COMPILE_STATUS);
+                if (!compiled) {
+                    error = gl.getShaderInfoLog(fragmentShader);
+                    console.log("Error compilación Fragment Shader "  + error);
+                    return;
+                }
+
+                program = gl.createProgram();
+                if (!program) {
+                    return;
+                }
+
+                gl.attachShader(program , vertexShader);
+                gl.attachShader(program , fragmentShader);
+                gl.linkProgram(program);
+
+                var linked = gl.getProgramParameter(program , gl.LINK_STATUS);
+                if (!linked) {
+                    error = gl.getProgramInfoLog(program);
+                    console.log("Error enlace " + error);
+                    return;
+                }
+
+                gl.deleteShader(vertexShader);
+                gl.deleteShader(fragmentShader);
+
+                gl.useProgram(program);
+
+                in_position = gl.getAttribLocation(program , 'in_position');
+                if (in_position < 0) {
+                    console.log("Error al obtener ubicacion in_position");
+                    return;
+                }
+
+                in_color = gl.getAttribLocation(program , 'in_color');
+                if (in_color < 0) {
+                    console.log("Error al obtener ubicacion in_color");
+                    return;
+                }
+
+                loc_u_proj = gl.getUniformLocation(program , "u_proj");
+                loc_u_view = gl.getUniformLocation(program , "u_view");
+                loc_u_model = gl.getUniformLocation(program , "u_model");
+
+                vao = gl.createVertexArray();
+                gl.bindVertexArray(vao);
+
+                var vertices = new Float32Array(
+                    [  -2.0 , -2.0 , 2.0,
+                        2.0 , -2.0 , 2.0,
+                        2.0 ,  2.0 , 2.0,
+                        -2.0 , -2.0 , 2.0,
+                        -2.0 , 2.0 , 2.0,
+                        2.0 ,  2.0 , 2.0,
+
+                        -2.0 , -2.0 , -2.0,
+                        2.0 , -2.0 ,- 2.0,
+                        2.0 ,  2.0 , -2.0,
+                        -2.0 , -2.0 , -2.0,
+                        -2.0 , 2.0 ,- 2.0,
+                        2.0 ,  2.0 ,- 2.0,
+
+                        -2.0 , -2.0 , 2.0,
+                        -2.0 , -2.0 , -2.0,
+                        2.0 ,  -2.0 , -2.0,
+                        -2.0 , -2.0 , 2.0,
+                        2.0 , -2.0 , 2.0,
+                        2.0 ,  -2.0 , -2.0,
+
+                        -2.0 , 2.0 , 2.0,
+                        -2.0 , 2.0 , -2.0,
+                        2.0 ,  2.0 , -2.0,
+                        -2.0 , 2.0 , 2.0,
+                        2.0 , 2.0 , 2.0,
+                        2.0 ,  2.0 , -2.0,
+
+                        -2.0 , 2.0 , -2.0,
+                        -2.0 , -2.0 , -2.0,
+                        -2.0 , -2.0 , 2.0,
+                        -2.0 , 2.0 , -2.0,
+                        -2.0 , -2.0 , 2.0,
+                        -2.0 , 2.0 , 2.0,
+                        
+                        2.0 , 2.0 , -2.0,
+                        2.0 , -2.0 , -2.0,
+                        2.0 , -2.0 , 2.0,
+                        2.0 , 2.0 , -2.0,
+                        2.0 , -2.0 , 2.0,
+                        2.0 , 2.0 , 2.0,
+                    ]
+                );
+
+                var vboPositions = gl.createBuffer();
+                if (!vboPositions) {
+                    console.log("Error crear vboPositions");
+                    return;
+                }
+
+                gl.bindBuffer(gl.ARRAY_BUFFER , vboPositions);
+                gl.bufferData(gl.ARRAY_BUFFER , vertices , gl.STATIC_DRAW);
+
+                gl.vertexAttribPointer(in_position , 3 , gl.FLOAT , false , 0 , 0);
+                gl.enableVertexAttribArray(in_position);
+
+
+                var colors = new Float32Array(
+                    [0.0 , 0.0 , 1.0,
+                     0.0 , 0.0 , 1.0,
+                     0.0 , 0.0 , 1.0,
+                     0.0 , 0.0 , 1.0,
+                     0.0 , 0.0 , 1.0,
+                     0.0 , 0.0 , 1.0,
+
+                     1.0 , 0.0 , 0.0,
+                     1.0 , 0.0 , 0.0,
+                     1.0 , 0.0 , 0.0,
+                     1.0 , 0.0 , 0.0,
+                     1.0 , 0.0 , 0.0,
+                     1.0 , 0.0 , 0.0,
+
+                     1.0 , 1.0 , 1.0,
+                     1.0 , 1.0 , 1.0,
+                     1.0 , 1.0 , 1.0,
+                     1.0 , 1.0 , 1.0,
+                     1.0 , 1.0 , 1.0,
+                     1.0 , 1.0 , 1.0,
+
+                     1.0 , 0.5 , 0.0,
+                     1.0 , 0.5 , 0.0,
+                     1.0 , 0.5 , 0.0,
+                     1.0 , 0.5 , 0.0,
+                     1.0 , 0.5 , 0.0,
+                     1.0 , 0.5 , 0.0,
+
+                     0.0 , 1.0 , 0.0,
+                     0.0 , 1.0 , 0.0,
+                     0.0 , 1.0 , 0.0,
+                     0.0 , 1.0 , 0.0,
+                     0.0 , 1.0 , 0.0,
+                     0.0 , 1.0 , 0.0,
+                     
+                     1.0 , 0.0 , 1.0,
+                     1.0 , 0.0 , 1.0,
+                     1.0 , 0.0 , 1.0,
+                     1.0 , 0.0 , 1.0,
+                     1.0 , 0.0 , 1.0,
+                     1.0 , 0.0 , 1.0,
+                    ]
+                );
+
+                var vboColors = gl.createBuffer();
+                if (!vboColors) {
+                    console.log("Error crear vboColors");
+                    return;
+                }
+
+                gl.bindBuffer(gl.ARRAY_BUFFER , vboColors);
+                gl.bufferData(gl.ARRAY_BUFFER , colors , gl.STATIC_DRAW);
+
+                gl.vertexAttribPointer(in_color , 3 , gl.FLOAT , false , 0 , 0);
+                gl.enableVertexAttribArray(in_color);
+
+                // fieldOfViewInRadians, aspect, near, far
+                m_proj = m4.perspective(200 / 280 * Math.PI ,
+                    canvas.clientWidth / canvas.clientHeight , 0.1 , 100);
+
+                m_view = m4.identity();
+                m_view = m4.translate(m_view , 0 , 0 , 1);
+                m_view = m4.inverse(m_view);
+
+                m_model = m4.identity();
+
+                draw();
+            }
+            var rotation = 0;
+
+            function draw() {
+                gl.clearColor(0 , 0, 0, 1);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+                gl.enable(gl.DEPTH_TEST);
+
+                gl.bindVertexArray(vao);
+
+                m_model = m4.identity();
+                rotation += 0.1;
+                m_model = m4.xRotation(rotation);
+                
+
+                gl.uniformMatrix4fv(loc_u_proj , false , m_proj);
+                gl.uniformMatrix4fv(loc_u_view , false , m_view);
+                gl.uniformMatrix4fv(loc_u_model , false , m_model);
+
+                gl.drawArrays(gl.TRIANGLES , 0 , 36);
+
+                requestAnimationFrame(draw);
+
+            }
+
+            function initWebgl() {
+
+                gl = canvas.getContext("webgl2");
+
+                if (!gl) {
+                    alert("No se puede iniciar WebGL 2");
+                }
+
+                console.log(gl.getParameter(gl.VERSION));
+                console.log(gl.getParameter(gl.SHADING_LANGUAGE_VERSION));
+            }
+
+        </script>
+    </body>
+    
+</html>
